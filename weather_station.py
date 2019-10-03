@@ -10,9 +10,6 @@ import Adafruit_DHT
 
 class Sensor():
     def __init__(self):
-        self.temperature_momentary = 0.0
-        self.temperature_momentary_GUI = DoubleVar()
-        self.temperature_momentary_GUI.set(0.0)
         self.timestamp = ''
         
     def read(self):
@@ -23,8 +20,28 @@ class Sensor():
         self.thread.daemon = True
         self.thread.start()
         
-class Sensor_DS18B20(Sensor):
-    
+class Sensor_temperature(Sensor):
+    def __init__(self):
+        super().__init__()
+        self.temperature_momentary = 0.0
+        self.temperature_momentary_GUI = DoubleVar()
+        self.temperature_momentary_GUI.set(0.0)
+        
+class Sensor_humidity(Sensor):
+    def __init__(self):
+        super().__init__()
+        self.humidity_momentary = 0.0
+        self.humidity_momentary_GUI = DoubleVar()
+        self.humidity_momentary_GUI.set(0.0)
+        
+class Sensor_pressure(Sensor):
+    def __init__(self):
+        super().__init__()
+        self.pressure_momentary = 0.0
+        self.pressure_momentary_GUI = DoubleVar()
+        self.pressure_momentary_GUI.set(0.0)         
+        
+class Sensor_DS18B20(Sensor_temperature):    
     def __init__(self):
         super().__init__()
         self.thermosensor = w1thermsensor.W1ThermSensor()
@@ -34,24 +51,31 @@ class Sensor_DS18B20(Sensor):
             self.temperature_momentary = self.thermosensor.get_temperature()
             self.timestamp = str(datetime.datetime.now())
             self.temperature_momentary_GUI.set(self.temperature_momentary)
-            #act_temperature_DS.set(self.temperature_momentary) #TODO: now its fixed connection to GUI element because of lable refreash, needs some kind of interface to GUI
-            #print('{0} DS18B20: Temp: {1:0.3f} C'.format(self.timestamp, self.temperature_momentary))
+            print('{0} DS18B20: Temp: {1:0.3f} C'.format(self.timestamp, self.temperature_momentary))
             sleep(5)
 
-class Sensor_DHT11(Sensor):
-    pass
+class Sensor_DHT11(Sensor_temperature, Sensor_humidity):
+    def __init__(self, gpio):
+        super().__init__()
+        self.gpio = gpio
+            
+    def read(self):
+        while True:
+            self.humidity_momentary, self.temperature_momentary = Adafruit_DHT.read_retry(11, self.gpio)
+            self.timestamp = str(datetime.datetime.now())
+            self.humidity_momentary_GUI.set(self.humidity_momentary)
+            self.temperature_momentary_GUI.set(self.temperature_momentary)
+            print('{0} DHT11:   Temp: {1:0.1f} C | Hum: {2:0.1f} %'.format(self.timestamp, self.temperature_momentary, self.humidity_momentary))
+            sleep(5)
+            
+class Sensor_BME280(Sensor_temperature, Sensor_humidity, Sensor_pressure):
+    def read(self):
+        while True:
+            self.timestamp = str(datetime.datetime.now())
+            print('{0} BME280:  Temp: {1:0.3f} C | Hum: {2:0.3f} % | Press: {3:0.3f}'.format(self.timestamp, self.temperature_momentary, self.humidity_momentary, self.pressure_momentary))
+            sleep(5)
+            
 
-
-
-'''
-        
-def readDHT():
-    while True:
-        humidity_momentary, temperature_momentary = Adafruit_DHT.read_retry(11, 21)
-        act_humidity_DHT.set(humidity_momentary)
-        act_temperature_DHT.set(temperature_momentary)
-        sleep(5)
-'''
 
 ###########################
 ##### GUI ROOT WINDOW #####
@@ -68,6 +92,12 @@ windowMain.title('Weather station v0.2')
 
 sensorDS = Sensor_DS18B20()
 sensorDS.start_reading()
+
+sensorDHT = Sensor_DHT11(21)
+sensorDHT.start_reading()
+
+sensorBME = Sensor_BME280()
+sensorBME.start_reading()
 
 ######################
 ##### GUI LAYOUT #####
@@ -112,22 +142,13 @@ ttk.Label(frameDHT_title, text = 'DHT11', style = 'title.TLabel').pack()
 
 ttk.Label(frameDHT_temperature, text = 'Temperature', style = 'measurement_title.TLabel').grid(row = 0, column = 0, columnspan = 11)
 
-ttk.Label(frameDHT_temperature, textvariable = act_temperature_DHT, style = 'reading.TLabel').grid(row = 10, column = 0)
+ttk.Label(frameDHT_temperature, textvariable = sensorDHT.temperature_momentary_GUI, style = 'reading.TLabel').grid(row = 10, column = 0)
 ttk.Label(frameDHT_temperature, text = '[˚C]', style = 'reading.TLabel').grid(row = 10, column = 10)
 
 ttk.Label(frameDHT_humidity, text = 'Humidity', style = 'measurement_title.TLabel').grid(row = 0, column = 0, columnspan = 11)
 
-ttk.Label(frameDHT_humidity, textvariable = act_humidity_DHT, style = 'reading.TLabel').grid(row = 10, column = 0)
+ttk.Label(frameDHT_humidity, textvariable = sensorDHT.humidity_momentary_GUI, style = 'reading.TLabel').grid(row = 10, column = 0)
 ttk.Label(frameDHT_humidity, text = '[%]', style = 'reading.TLabel').grid(row = 10, column = 10)
-
-'''
-##### START DS18B20 READING THREAD #####
-
-threadDHT = threading.Thread(target = readDHT)
-threadDHT.daemon = True
-threadDHT.start()
-'''
-
 
 ####################
 ##### GUI LOOP #####
